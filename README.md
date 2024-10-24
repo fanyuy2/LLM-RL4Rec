@@ -1,6 +1,6 @@
 # LLM-RL4Rec
 
-Task By Friday Oct 25, 2024
+Tasks By Friday Oct 25, 2024
 
 Rishabh & Rutik 
 - report 
