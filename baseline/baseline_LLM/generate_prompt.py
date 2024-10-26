@@ -41,9 +41,9 @@ I have previously watched and liked the movies: {liked_movies}."""
 
     prompt += f"""
 Based on my history, recommend the top {top_k} movies I am most likely to watch next.
-Please provide the output in a Python list of strings format, containing only the movie titles.
-
-Format Example Output: ['movie_name']
+Please provide the output in a list of strings format, containing only the movie titles.
+Make sure to strictly adhere to the output format given below. Strictly do not generate any additional information other than the movie names.
+Format:  ['movie_name', 'movie_name', ... 'movie_name']
 Make sure to limit the recommendations to movies available in the MovieLens dataset."""
 
     return prompt
