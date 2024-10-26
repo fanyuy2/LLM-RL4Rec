@@ -29,6 +29,8 @@ class DataLoader:
                                                 'thriller', 'war', 'western'])  # Update with the correct path
             self.ratings_df = pd.read_csv('../../dataset/ml-100k/ml-100k/u.data', sep='\t',
                                           names=['user_id', 'movie_id', 'rating',
-                                                 'timestamp'], date_parser=dateparse)  # Update with the correct path
+                                                 'timestamp'],
+                                          parse_dates = ['timestamp'],
+                                          date_parser=lambda x: pd.to_datetime(int(x), unit='s'))  # Update with the correct path
             print("Data loaded.")
         return self.users_df, self.movies_df, self.ratings_df
