@@ -1,4 +1,14 @@
 import pandas as pd
+from pyzipcode import ZipCodeDatabase
+zcdb = ZipCodeDatabase()
+
+def get_city_state(zip_code):
+    try:
+        zip_info = zcdb[zip_code]
+        return zip_info.city, zip_info.state
+    except KeyError:
+        return None, None
+
 
 def preprocess_data(users_df, movies_df, ratings_df):
     """
@@ -12,6 +22,8 @@ def preprocess_data(users_df, movies_df, ratings_df):
     Returns:
     - pd.DataFrame: A DataFrame that includes user info, liked and disliked movies, and their genres.
     """
+    users_df[['city', 'state']] = users_df['zip_code'].apply(lambda zip_code: pd.Series(get_city_state(zip_code)))
+
     # Ensure that the relevant columns are present and clean
     users_df.dropna(subset=['user_id', 'age', 'gender', 'occupation', 'city', 'state'], inplace=True)
     movies_df.dropna(subset=['movie_id', 'movie_title'], inplace=True)
@@ -32,8 +44,8 @@ def preprocess_data(users_df, movies_df, ratings_df):
 
     # Optional: convert timestamp to datetime if needed
     merged_df['timestamp'] = pd.to_datetime(merged_df['timestamp'])
-
-    return merged_df
+    # print(merged_df.columns)
+    return merged_df[['user_id', 'movie_id', 'rating', 'timestamp', 'movie_title','genre']]
 
 # Example usage
 # Assuming you have the DataFrames users_df, movies_df, and ratings_df as described.

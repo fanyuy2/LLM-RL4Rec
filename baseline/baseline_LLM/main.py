@@ -1,16 +1,17 @@
-import pandas as pd
+from dataloader import DataLoader
 from preprocess import preprocess_data
 from generate_prompt import generate_prompt
 from models import get_llm_recommendations
 
 def main():
-    # Load the datasets
-    users_df = pd.read_csv('path/to/users.csv')  # Update with the correct path
-    movies_df = pd.read_csv('path/to/movies.csv')  # Update with the correct path
-    ratings_df = pd.read_csv('path/to/ratings.csv')  # Update with the correct path
+    # Create a DataLoader instance and load the datasets once
+    data_loader = DataLoader()
+    users_df, movies_df, ratings_df = data_loader.load_data()
 
     # Preprocess the data
     cleaned_data = preprocess_data(users_df, movies_df, ratings_df)
+
+    print(cleaned_data.head())
 
     # Example: Assuming you have a specific user_id to recommend movies for
     user_id = 1  # Replace with the user_id you want to analyze
@@ -19,10 +20,10 @@ def main():
 
     # Generate the prompt for the user
     prompt = generate_prompt(cleaned_data, user_id, threshold_positive, threshold_negative)
-
+    print(prompt)
     # Get movie recommendations using the model
     recommended_movies = get_llm_recommendations(prompt)
-
+    print(recommended_movies)
     # Print or process the recommendations
     print(f"Recommended movies for user {user_id}: {recommended_movies}")
 
