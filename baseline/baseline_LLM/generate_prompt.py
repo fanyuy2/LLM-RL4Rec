@@ -40,6 +40,7 @@ I have previously watched and liked the movies: {liked_movies}."""
         prompt += f"\nI have also watched and disliked the movies: {disliked_movies}."
 
     prompt += f"""
+Please provide recommendations for movies released before April 22nd, 1998, based on my history.
 Based on my history, recommend the top {top_k} movies I am most likely to watch next.
 Please provide the output in a list of strings format, containing only the movie titles.
 Make sure to strictly adhere to the output format given below. Strictly do not generate any additional information other than the movie names.

@@ -22,7 +22,7 @@ def main():
     prompt = generate_prompt(cleaned_data, user_id, threshold_positive, threshold_negative)
     print(prompt)
     # Get movie recommendations using the model
-    recommended_movies = get_llm_recommendations(prompt)
+    recommended_movies = get_llm_recommendations(prompt, movies_df)
     print(recommended_movies)
     # Print or process the recommendations
     print(f"Recommended movies for user {user_id}: {recommended_movies}")
