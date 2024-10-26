@@ -1,1 +1,2 @@
 huggingface-hub==0.26.1
+pyzipcode==3.0.1
