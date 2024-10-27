@@ -50,6 +50,7 @@ Make sure to limit the recommendations to movies available in the MovieLens data
     return prompt
 
 
+
 if __name__ == '__main__':
     # Sample user profile and history window with ratings
     user_profile = {

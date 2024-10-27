@@ -71,7 +71,7 @@ def get_llm_recommendations(prompt, movies_df, model_name="meta-llama/Llama-3.2-
     Returns:
     - list of str: A list of recommended movie titles parsed from the LLM's output.
     """
-    movie_titles, movie_embeddings = get_movie_embeddings(movies_df)
+
     try:
         # Send the prompt to the LLM
         response = client.chat.completions.create(
@@ -83,8 +83,10 @@ def get_llm_recommendations(prompt, movies_df, model_name="meta-llama/Llama-3.2-
 
         # Extract the response text
         llm_output = response['choices'][0]['message']['content'].strip()
-        print(llm_output)
+        print("llm output:", llm_output)
         # Use regex to extract the list of movie titles from the output
+
+        movie_titles, movie_embeddings = get_movie_embeddings(movies_df)
         movie_list_match = re.search(r"\[.*?\]", llm_output, re.DOTALL)
         if movie_list_match:
             # Evaluate the extracted string to a Python list

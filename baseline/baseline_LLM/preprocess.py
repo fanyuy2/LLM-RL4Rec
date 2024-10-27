@@ -9,6 +9,18 @@ def get_city_state(zip_code):
     except KeyError:
         return None, None
 
+def process_user_df(users_df):
+    users_dict = {
+        row["user_id"]: {
+            "age": row["age"],
+            "gender": "male" if row["gender"] == "M" else "female",
+            "occupation": row["occupation"],
+            "location": f"{row['city']}, {row['state']}"
+        }
+        for _, row in users_df.iterrows()
+    }
+    return users_dict
+
 
 def preprocess_data(users_df, movies_df, ratings_df):
     """
@@ -23,6 +35,17 @@ def preprocess_data(users_df, movies_df, ratings_df):
     - pd.DataFrame: A DataFrame that includes user info, liked and disliked movies, and their genres.
     """
     users_df[['city', 'state']] = users_df['zip_code'].apply(lambda zip_code: pd.Series(get_city_state(zip_code)))
+
+    # convert user_df to user_profiles (dict of dict), used for generate_prompt
+    users_dict = {
+        row["user_id"]: {
+            "age": row["age"],
+            "gender": "male" if row["gender"] == "M" else "female",
+            "occupation": row["occupation"],
+            "location": f"{row['city']}, {row['state']}"
+        }
+        for _, row in users_df.iterrows()
+    }
 
     # Ensure that the relevant columns are present and clean
     users_df.dropna(subset=['user_id', 'age', 'gender', 'occupation', 'city', 'state'], inplace=True)
@@ -45,7 +68,7 @@ def preprocess_data(users_df, movies_df, ratings_df):
     # Optional: convert timestamp to datetime if needed
     merged_df['timestamp'] = pd.to_datetime(merged_df['timestamp'])
     # print(merged_df.columns)
-    return merged_df[['user_id', 'movie_id', 'rating', 'timestamp', 'movie_title','genre']]
+    return users_dict, merged_df[['user_id', 'movie_id', 'rating', 'timestamp', 'movie_title','genre']]
 
 # Example usage
 # Assuming you have the DataFrames users_df, movies_df, and ratings_df as described.
