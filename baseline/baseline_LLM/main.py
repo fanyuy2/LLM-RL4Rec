@@ -140,56 +140,56 @@ def get_ground_truth(cleaned_data, user_id, timestamp, p, threshold_positive):
 
 
 def main():
-    # # Initialize data loader and load datasets
-    # data_loader = DataLoader()
-    # users_df, movies_df, ratings_df = data_loader.load_data()
-    #
-    #
-    # # Preprocess the data
-    # user_profiles, cleaned_data = preprocess_data(users_df, movies_df, ratings_df)
-    #
-    # # users_profiles = process_user_df(users_df)
-    #
-    # # Define constants for evaluation
-    # user_id = 123  # Replace with the target user ID
-    # threshold_positive = 3  # Rating threshold for "liked" movies
-    # threshold_negative = 2  # Rating threshold for "disliked" movies
-    # window_size = 5  # Number of positive and negative samples to retrieve.
-    # top_k = 5  # Number of recommendations to fetch
-    # next_p = 5  # Number of future movies to use for ground truth
-    # evaluation_k = 5  # Evaluation cutoff for metrics
-    #
-    # print(ratings_df[ratings_df['user_id']==user_id])
-    #
-    # # Sample a timestamp for the user
-    # user_ratings = ratings_df[ratings_df['user_id'] == user_id]
-    # # timestamp = sample_timestamp(user_ratings)
-    #
-    # # Get liked and disliked movies in the history window
-    # history_window, timestamp = get_user_history_window_v2(
-    #     cleaned_data, user_id, window_size
-    # )
-    #
-    # print(history_window)
-    #
-    # # Generate the prompt based on history window
-    # prompt = generate_prompt(user_profiles[user_id], history_window, top_k,
-    #                          positive_threshold=threshold_positive,
-    #                          negative_threshold=threshold_negative)
+    # Initialize data loader and load datasets
+    data_loader = DataLoader()
+    users_df, movies_df, ratings_df = data_loader.load_data()
 
-    movies_df = None
-    top_k = 5
-    prompt = """I am a female, aged 48, from Washington, DC, working as artist.
-I have previously watched and liked the movies: ['Leaving Las Vegas (1995) (drama, romance)', 'Secrets & Lies (1996) (drama)', 'Star Wars (1977) (action, adventure, romance, sci_fi, war)', 'Sense and Sensibility (1995) (drama, romance)', 'Dead Man Walking (1995) (drama)'].
-Please provide recommendations for movies released before April 22nd, 1998, based on my history.
-Based on my history, recommend the top 5 movies I am most likely to watch next.
-Please provide the output in a list of strings format, containing only the movie titles.
-Make sure to strictly adhere to the output format given below. Strictly do not generate any additional information other than the movie names.
-Format:  ['movie_name', 'movie_name', ... 'movie_name']
-Make sure to limit the recommendations to movies available in the MovieLens dataset."""
+
+    # Preprocess the data
+    user_profiles, cleaned_data = preprocess_data(users_df, movies_df, ratings_df)
+
+    # users_profiles = process_user_df(users_df)
+
+    # Define constants for evaluation
+    user_id = 90  # Replace with the target user ID
+    threshold_positive = 3  # Rating threshold for "liked" movies
+    threshold_negative = 2  # Rating threshold for "disliked" movies
+    window_size = 5  # Number of positive and negative samples to retrieve.
+    top_k = 5  # Number of recommendations to fetch
+    next_p = 5  # Number of future movies to use for ground truth
+    evaluation_k = 5  # Evaluation cutoff for metrics
+
+    # print(ratings_df[ratings_df['user_id']==user_id])
+
+
+    # Sample a timestamp for the user
+    user_ratings = ratings_df[ratings_df['user_id'] == user_id]
+    # timestamp = sample_timestamp(user_ratings)
+
+    # Get liked and disliked movies in the history window
+    history_window, timestamp = get_user_history_window_v2(
+        cleaned_data, user_id, window_size
+    )
+
+    # Generate the prompt based on history window
+    prompt = generate_prompt(user_profiles[user_id], history_window, top_k,
+                             include_dislikes=True,
+                             positive_threshold=threshold_positive,
+                             negative_threshold=threshold_negative)
+
+
+
+#     top_k = 5
+#     movies_df = None
+#     prompt = """You job is to strictly recommend me top 5 movies to watch based on my information and history that I provide next. I am a female, aged 48, from Washington, DC, working as artist.
+#     I have previously watched and liked the movies: ['Secrets & Lies (1996) (drama)', 'Leaving Las Vegas (1995) (drama, romance)', 'Sense and Sensibility (1995) (drama, romance)', 'Dead Man Walking (1995) (drama)'].
+# I have also watched and disliked the movies: ["My Best Friend's Wedding (1997) (comedy, romance)"].You should very strictly not generate any additional information other than the movie names. Please provide the output in a list of strings format, containing only the movie titles.
+#     Make sure to strictly adhere to the output format given below.
+#     Format:  ['movie_name', 'movie_name', ... 'movie_name']
+#     Make sure to limit the recommendations to movies available in the MovieLens dataset and also the recommendations for movies should strictly be the ones released before April 22nd, 1998."""
 
     # Get movie recommendations from the LLM
-    recommended_movies = get_llm_recommendations(prompt, movies_df)[:top_k]
+    recommended_movies = get_llm_recommendations(user_id, prompt, movies_df)[:top_k]
 
     # Fetch ground truth for evaluation
     ground_truth = get_ground_truth(cleaned_data, user_id, timestamp, next_p, threshold_positive)

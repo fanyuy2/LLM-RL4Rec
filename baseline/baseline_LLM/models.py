@@ -1,8 +1,11 @@
 import os
 import re
+import pandas as pd
 import numpy as np
 from huggingface_hub import InferenceClient
 from sentence_transformers import SentenceTransformer, util
+import re
+from torch.cuda import temperature
 
 # Retrieve the API key from an environment variable
 api_key = os.getenv("HUGGINGFACE_API_KEY")
@@ -21,6 +24,50 @@ def get_movie_embeddings(movies_df):
     titles = movies_df['movie_title'].tolist()
     embeddings = embedding_model.encode(titles, convert_to_tensor=True)
     return titles, embeddings
+
+
+def parse_llm_output(user_id, prompt, llm_output):
+    """
+    Parse llm outputs. Expecting input prompt as ['movie_1', 'movie_2', 'movie3'].
+    When llm incorrect
+
+    Parameters:
+    - user_id (int): user's id.
+    - prompt (str): prompt for the given user.
+    - llm_output (str): response given by the llm model.
+
+    return a list of string, of movie titles.
+    """
+    parsed_titles = []
+    unexpected_outputs = []
+
+    # Convert llm_output from a string to a list using eval (or better, ast.literal_eval for safety)
+    import ast
+    try:
+        llm_output_list = ast.literal_eval(llm_output)
+    except (ValueError, SyntaxError):
+        print(f"Error parsing llm_output: {llm_output}")
+        return []
+
+    for title in llm_output_list:
+        if isinstance(title, str):
+            match = re.match(r"(.+?)\s*\((\d{4})\)", title)
+
+            if match:
+                parsed_titles.append(match.group(1).strip())
+            else:
+                parsed_titles.append(title.strip())
+        else:
+            unexpected_outputs.append({'user_id': user_id, 'prompt': prompt, 'output': title})
+
+    if unexpected_outputs:
+        df = pd.DataFrame(unexpected_outputs)
+        csv_path = f'unexpected_outputs_user_{user_id}.csv'
+        df.to_csv(csv_path, index=False)
+        return csv_path
+
+    return parsed_titles
+
 
 def map_movies_to_dataset(y_hat, movie_titles, movie_embeddings, pooling='mean'):
     """
@@ -56,12 +103,14 @@ def map_movies_to_dataset(y_hat, movie_titles, movie_embeddings, pooling='mean')
     return mapped_movies
 
 
-def get_llm_recommendations(prompt, movies_df, model_name="meta-llama/Llama-3.2-1B-Instruct", max_tokens=500, top_k=5,  pooling='mean'):
+def get_llm_recommendations(user_id, prompt, movie_titles, movie_embeddings, model_name="meta-llama/Llama-3.2-11B-Vision-Instruct", max_tokens=500, top_k=5,  pooling='mean'):
     """
     Sends the prompt to the LLM and retrieves the recommended movie list.
 
     Parameters:
     - prompt (str): The input prompt generated for the LLM.
+    - movie_titles (list of str): Movie titles from the dataset.
+    - movie_embeddings (Tensor): Corresponding embeddings for the dataset movie titles.
     - movies_df (DataFrame): DataFrame containing movie information.
     - model_name (str): The name of the model to use for recommendations.
     - max_tokens (int): Maximum tokens to allow in the output.
@@ -77,6 +126,7 @@ def get_llm_recommendations(prompt, movies_df, model_name="meta-llama/Llama-3.2-
         response = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "movie recommender", "content": prompt}],
+            temperature=0.5,
             max_tokens=max_tokens,
             stream=False
         )
@@ -85,21 +135,28 @@ def get_llm_recommendations(prompt, movies_df, model_name="meta-llama/Llama-3.2-
         llm_output = response['choices'][0]['message']['content'].strip()
         print("llm output:", llm_output)
         # Use regex to extract the list of movie titles from the output
+        llm_rec_movies_ls = parse_llm_output(user_id, prompt, llm_output)
 
-        movie_titles, movie_embeddings = get_movie_embeddings(movies_df)
-        movie_list_match = re.search(r"\[.*?\]", llm_output, re.DOTALL)
-        if movie_list_match:
-            # Evaluate the extracted string to a Python list
-            recommendations = eval(movie_list_match.group())
-            if isinstance(recommendations, list) and all(isinstance(item, str) for item in recommendations):
-                mapped_movies = map_movies_to_dataset(recommendations[:top_k], movie_titles, movie_embeddings, pooling)
-                return mapped_movies
-            else:
-                # return []
-                raise ValueError("LLM response format is incorrect")
-        else:
-            print("No valid list of movie titles found in the output.")
-            return []
+        # map predicted movie with our item space.
+        mapped_movies = map_movies_to_dataset(llm_rec_movies_ls, movie_titles, movie_embeddings, pooling)
+        return mapped_movies
+
+        #
+        # movie_titles, movie_embeddings = get_movie_embeddings(movies_df)
+        #
+        # movie_list_match = re.search(r"\[.*?\]", llm_output, re.DOTALL)
+        # if movie_list_match:
+        #     # Evaluate the extracted string to a Python list
+        #     recommendations = eval(movie_list_match.group())
+        #     if isinstance(recommendations, list) and all(isinstance(item, str) for item in recommendations):
+        #
+        #         return mapped_movies
+        #     else:
+        #         # return []
+        #         raise ValueError("LLM response format is incorrect")
+        # else:
+        #     print("No valid list of movie titles found in the output.")
+        #     return []
 
     except Exception as e:
         print(f"Error during LLM API request or response parsing: {e}")
