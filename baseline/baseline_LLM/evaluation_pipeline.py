@@ -164,13 +164,13 @@ def split_user_prompt_data(input_file):
     df = pd.read_csv(input_file)
 
     # Split the data into 60% train and 40% test
-    train_data, test_data = train_test_split(df, test_size=0.2, random_state=42)
+    train_data, test_data = train_test_split(df, test_size=0.3, random_state=42)
 
     return train_data, test_data
 
 
-def save_split_data(train_data, test_data, train_file='user_prompt_train_data.csv',
-                    test_file='user_prompt_test_data.csv'):
+def save_split_data(train_data, test_data, train_file='user_prompt_train_data_28Oct_0.7_Split.csv',
+                    test_file='user_prompt_test_data_28Oct_0.3_Split.csv'):
     """Save train and test data to CSV files."""
     train_data.to_csv(train_file, index=False)
     test_data.to_csv(test_file, index=False)

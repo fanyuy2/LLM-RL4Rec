@@ -1,0 +1,45 @@
+28th Oct 2024
+train_test_split = 0.3
+Average Evaluation Metrics:
+MAP: 0.0240
+NDCG@k: 0.0232
+Precision@k: 0.0240
+Recall@k: 0.0046
+
+
+model: meta-llama/Llama-3.2-11B-Vision-Instruct
+ response = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "movie recommender", "content": prompt}],
+            temperature=0.5,
+            max_tokens=max_tokens,
+            stream=False
+        )
+ pooling = "mean"
+
+sentence embedding model: sentence-transformers/all-MiniLM-L6-v2
+
+
+
+Hyperparameters
+top_k: 5
+context window: 5
+threshold_negative: 2
+threshold_positive: 4
+
+
+prompt version:
+    prompt = f"""I am a {gender}, aged {age}, from {location}, working as {occupation}.
+I have previously watched and liked the movies: {liked_movies}."""
+
+    if include_dislikes and disliked_movies:
+        prompt += f"\nI have also watched and disliked the movies: {disliked_movies}."
+
+    prompt += f"""
+Please provide recommendations for movies released before April 22nd, 1998, based on my history.
+Based on my history, recommend the top {top_k} movies I am most likely to watch next.
+Please provide the output in a list of strings format, containing only the movie titles.
+Make sure to strictly adhere to the output format given below. Strictly do not generate any additional information other than the movie names.
+Format:  ['movie_name', 'movie_name', ... 'movie_name']
+Make sure to limit the recommendations to movies available in the MovieLens dataset."""
+
