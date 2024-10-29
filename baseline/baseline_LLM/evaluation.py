@@ -56,3 +56,35 @@ def evaluate_recommendations(y_true, y_pred, k):
         "Recall@k": recall_at_k(y_true, y_pred, k),
     }
     return metrics
+
+
+
+def evaluate_recommendations_for_all_users(y_true_all, y_pred_all, top_k):
+    map_scores = []
+    ndcg_scores = []
+    precision_scores = []
+    recall_scores = []
+
+    for user_id, y_pred in y_pred_all.items():
+        y_true = y_true_all[user_id]
+        map_scores.append(mean_average_precision(y_true, y_pred))
+        ndcg_scores.append(ndcg_at_k(y_true, y_pred, top_k))
+        precision_scores.append(precision_at_k(y_true, y_pred, top_k))
+        recall_scores.append(recall_at_k(y_true, y_pred, top_k))
+
+    # # Compute metrics for each user
+    # for y_true, y_pred in zip(y_true_all, y_pred_all):
+    #     map_scores.append(mean_average_precision(y_true, y_pred))
+    #     ndcg_scores.append(ndcg_at_k(y_true, y_pred, k))
+    #     precision_scores.append(precision_at_k(y_true, y_pred, k))
+    #     recall_scores.append(recall_at_k(y_true, y_pred, k))
+
+
+    # Average metrics across all users
+    metrics = {
+        "MAP": np.mean(map_scores),
+        "NDCG@k": np.mean(ndcg_scores),
+        "Precision@k": np.mean(precision_scores),
+        "Recall@k": np.mean(recall_scores),
+    }
+    return metrics

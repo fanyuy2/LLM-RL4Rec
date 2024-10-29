@@ -38,9 +38,10 @@ def parse_llm_output(user_id, prompt, llm_output):
 
     return a list of string, of movie titles.
     """
-    parsed_titles = []
-    unexpected_outputs = []
+    #parsed_titles = []
+    #unexpected_outputs = []
 
+    '''
     # Convert llm_output from a string to a list using eval (or better, ast.literal_eval for safety)
     import ast
     try:
@@ -65,8 +66,12 @@ def parse_llm_output(user_id, prompt, llm_output):
         csv_path = f'unexpected_outputs_user_{user_id}.csv'
         df.to_csv(csv_path, index=False)
         return csv_path
+    '''
+    cleaned = llm_output.strip("[]")
+    movie_list = [item.strip(" '\"") for item in cleaned.split(",")]
 
-    return parsed_titles
+    return movie_list
+    #return parsed_titles
 
 
 def map_movies_to_dataset(y_hat, movie_idx_ls, movie_embeddings, pooling='mean'):
@@ -94,7 +99,7 @@ def map_movies_to_dataset(y_hat, movie_idx_ls, movie_embeddings, pooling='mean')
         y_hat_embeddings, _ = y_hat_embeddings.max(dim=0, keepdim=True)
 
     # Calculate cosine similarities
-    cosine_scores = util.pytorch_cos_sim(y_hat_embeddings, movie_embeddings[movie_idx_ls])
+    cosine_scores = util.pytorch_cos_sim(y_hat_embeddings.to('cpu'), movie_embeddings[movie_idx_ls])
 
     # Get the top matches
     top_results = np.argpartition(-cosine_scores.cpu().numpy(), range(5))[:, :5]
@@ -120,16 +125,17 @@ def model_prediction(prompts_df, watched_dict, all_movie_indices, all_movie_embe
     - pandas dataframe: user_id, top_k_movies.
     """
 
-    predictions = []
+    predictions = dict()
+    num_row = 0
 
     for row in prompts_df.itertuples(index=False):
+        num_row += 1
+        if num_row % 50 == 0:
+            print("num_row is", num_row)
         # get valid recommendation space for the current user
         cur_embedding_idx = [i for i, movie in enumerate(all_movie_indices) if movie not in watched_dict[row.user_id]]
-        cur_predict = get_llm_recommendations(row.user_id, row.prompt, all_movie_embeddings, cur_embedding_idx, top_k=top_k, pooling=pooling, max_tokens=max_tokens, model_name=model_name)
-        predictions.append(cur_predict)
-
-    predictions = pd.DataFrame(predictions, columns=['top_k_movies'])
-    predictions['user_id'] = prompts_df['user_id']
+        cur_predict = get_llm_recommendations(row.user_id, row.Prompt, all_movie_embeddings, cur_embedding_idx, top_k=top_k, pooling=pooling, max_tokens=max_tokens, model_name=model_name)
+        predictions[row.user_id] = cur_predict
 
     return predictions
 
@@ -166,12 +172,13 @@ def get_llm_recommendations(user_id, prompt, movie_embeddings, embedding_idx, mo
 
         # Extract the response text
         llm_output = response['choices'][0]['message']['content'].strip()
-        print("llm output:", llm_output)
+        #print("llm output:", llm_output)
         # Use regex to extract the list of movie titles from the output
         llm_rec_movies_ls = parse_llm_output(user_id, prompt, llm_output)
-
+        #print("Parsed output:", llm_rec_movies_ls)
         # map predicted movie with our item space.
         mapped_movies = map_movies_to_dataset(llm_rec_movies_ls, embedding_idx, movie_embeddings, pooling)
+        #print('Mapped movies: ', mapped_movies)
         return mapped_movies
         #
         # movie_titles, movie_embeddings = get_movie_embeddings(movies_df)

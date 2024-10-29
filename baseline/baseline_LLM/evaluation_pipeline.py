@@ -1,13 +1,14 @@
 import random
 import pandas as pd
 import numpy as np
+import torch
 
 from baseline.baseline_LLM.preprocess import process_user_df
 from dataloader import DataLoader
 from preprocess import preprocess_data
 from generate_prompt import generate_prompt
-from models import get_llm_recommendations
-from evaluation import evaluate_recommendations
+from models import model_prediction
+from evaluation import evaluate_recommendations_for_all_users
 from sklearn.model_selection import train_test_split
 from collections import defaultdict
 
@@ -163,7 +164,7 @@ def split_user_prompt_data(input_file):
     df = pd.read_csv(input_file)
 
     # Split the data into 60% train and 40% test
-    train_data, test_data = train_test_split(df, test_size=0.4, random_state=42)
+    train_data, test_data = train_test_split(df, test_size=0.2, random_state=42)
 
     return train_data, test_data
 
@@ -233,11 +234,12 @@ def evaluator():
     # # Initialize data loader and load datasets
     # data_loader = DataLoader()
     # users_df, movies_df, ratings_df = data_loader.load_data()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Preprocess the data
     # user_profiles, cleaned_data = preprocess_data(users_df, movies_df, ratings_df)
     movie_id_list, movie_titles_list, movie_embeddings_2d_list = read_embeddings_from_csv('movie_embeddings.csv')
-
+    movie_embeddings_2d_list = torch.FloatTensor(movie_embeddings_2d_list)#.to(device)
     '''
     users_profiles = process_user_df(users_df)
 
@@ -292,16 +294,19 @@ def evaluator():
     users_future_liked_movies = fetch_user_future_liked_movies('user_liked_future_movies.csv', test_user_ids)
 
     # Get movie recommendations from the LLM
-    recommended_movies = get_llm_recommendations(test_user_ids, test_user_prompt_data, movie_titles_list, movie_embeddings_2d_list,
-                                                 top_k=top_k)
+    #recommended_movies = get_llm_recommendations(test_user_ids, test_user_prompt_data, movie_titles_list, movie_embeddings_2d_list,
+    #                                             top_k=top_k)
 
+    recommended_movies = model_prediction(test_user_prompt_data, users_watch_history, movie_id_list, movie_embeddings_2d_list)
 
 
     # Calculate evaluation metrics
-    metrics = evaluate_recommendations(ground_truth, recommended_movies, evaluation_k)
+    #metrics = evaluate_recommendations(ground_truth, recommended_movies, evaluation_k)
+
+    metrics = evaluate_recommendations_for_all_users(users_future_liked_movies, recommended_movies, top_k)
 
     # Output the evaluation results
-    print(f"Evaluation Metrics for User {user_id}:")
+    print(f"Average Evaluation Metrics:")
     for metric, value in metrics.items():
         print(f"{metric}: {value:.4f}")
 
