@@ -1,12 +1,13 @@
 import random
 import pandas as pd
+import json
 
-from baseline.baseline_LLM.preprocess import process_user_df
+# from baseline.baseline_LLM.preprocess import process_user_df
 from dataloader import DataLoader
 from preprocess import preprocess_data
 from generate_prompt import generate_prompt
-from models import get_llm_recommendations
-from evaluation import evaluate_recommendations
+# from models import get_llm_recommendations
+# from evaluation import evaluate_recommendations
 
 # pip install huggingface_hub
 # export HUGGINGFACE_API_KEY="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"
@@ -34,7 +35,7 @@ def sample_valid_timestamp(cleaned_data, user_id, threshold_positive, threshold_
     user_data['neg_count'] = (user_data['rating'] <= threshold_negative).cumsum()
 
     # Find valid timestamps where counts meet window_size requirements
-    valid_points = user_data[(user_data['pos_count'] >= window_size) & (user_data['neg_count'] >= window_size)]
+    valid_points = user_data[(user_data['pos_count'] >= window_size) | (user_data['neg_count'] >= window_size)]
 
     # Randomly select a valid timestamp or return None if no valid point exists
     if not valid_points.empty:
@@ -116,7 +117,7 @@ def get_user_history_window_v2(cleaned_data, user_id, window_size, threshold_pos
     user_data = user_data.sort_values(by='timestamp', ascending=False)
 
     # Get the most recent 'window_size' interactions
-    user_data_window = user_data.head(window_size)
+    user_data_window = user_data.head(window_size*2)
 
     # Build the history_window
     history_window = []
@@ -135,8 +136,9 @@ def get_ground_truth(cleaned_data, user_id, timestamp, p, threshold_positive):
     """Fetch the next p movies the user rated highly (above threshold) after timestamp."""
     future_data = cleaned_data[(cleaned_data['user_id'] == user_id) & (cleaned_data['timestamp'] > timestamp)]
     future_liked = future_data[future_data['rating'] >= threshold_positive].sort_values(by='timestamp')
-
-    return future_liked['movie_id'].head(p).tolist()
+    liked_movie_ids = future_liked['movie_id'].head(p).tolist()
+    liked_movie_names = future_liked['movie_title'].head(p).tolist()
+    return liked_movie_ids, liked_movie_names
 
 
 def main():
@@ -151,7 +153,7 @@ def main():
     # users_profiles = process_user_df(users_df)
 
     # Define constants for evaluation
-    user_id = 90  # Replace with the target user ID
+    user_id = 81  # Replace with the target user ID
     threshold_positive = 3  # Rating threshold for "liked" movies
     threshold_negative = 2  # Rating threshold for "disliked" movies
     window_size = 5  # Number of positive and negative samples to retrieve.
@@ -177,6 +179,38 @@ def main():
                              positive_threshold=threshold_positive,
                              negative_threshold=threshold_negative)
 
+    print(prompt)
+
+
+    data = {}
+    user_id_unique = cleaned_data.user_id.unique()
+    for user_id in user_id_unique:
+        # print(user_id,type(user_id))
+
+        history_window, timestamp = get_user_history_window_v2(
+            cleaned_data, user_id, window_size
+        )
+        if timestamp == -1:
+            continue
+        prompt = generate_prompt(user_profiles[user_id], history_window, top_k,
+                                 include_dislikes=True,
+                                 positive_threshold=threshold_positive,
+                                 negative_threshold=threshold_negative)
+        ground_movie_ids, ground_movie_names = get_ground_truth(cleaned_data, user_id, timestamp, next_p, threshold_positive)
+        if ground_movie_names:
+            data[int(user_id)] = {
+                'user_id': int(user_id),
+                'prompt': prompt,
+                'ground_truth': ground_movie_names,
+            }
+        # except Exception as e:
+        #     print(e)
+        #     pass
+    with open('data.json', 'w') as outfile:
+        json.dump(data, outfile)
+    # json.dump(data, open('baseline_LLM-RL4Rec/data.json', 'w'))
+
+
 
 
 #     top_k = 5
@@ -188,19 +222,19 @@ def main():
 #     Format:  ['movie_name', 'movie_name', ... 'movie_name']
 #     Make sure to limit the recommendations to movies available in the MovieLens dataset and also the recommendations for movies should strictly be the ones released before April 22nd, 1998."""
 
-    # Get movie recommendations from the LLM
-    recommended_movies = get_llm_recommendations(user_id, prompt, movies_df)[:top_k]
-
-    # Fetch ground truth for evaluation
-    ground_truth = get_ground_truth(cleaned_data, user_id, timestamp, next_p, threshold_positive)
-
-    # Calculate evaluation metrics
-    metrics = evaluate_recommendations(ground_truth, recommended_movies, evaluation_k)
-
-    # Output the evaluation results
-    print(f"Evaluation Metrics for User {user_id}:")
-    for metric, value in metrics.items():
-        print(f"{metric}: {value:.4f}")
+    # # Get movie recommendations from the LLM
+    # recommended_movies = get_llm_recommendations(user_id, prompt, movies_df)[:top_k]
+    #
+    # # Fetch ground truth for evaluation
+    # ground_truth = get_ground_truth(cleaned_data, user_id, timestamp, next_p, threshold_positive)
+    #
+    # # Calculate evaluation metrics
+    # metrics = evaluate_recommendations(ground_truth, recommended_movies, evaluation_k)
+    #
+    # # Output the evaluation results
+    # print(f"Evaluation Metrics for User {user_id}:")
+    # for metric, value in metrics.items():
+    #     print(f"{metric}: {value:.4f}")
 
 
 if __name__ == '__main__':

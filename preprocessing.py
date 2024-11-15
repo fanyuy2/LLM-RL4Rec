@@ -1,9 +1,13 @@
 import pandas as pd
+import os
+
+print(os.getcwd())
+base_path = "./dataset/ml-100k/ml-100k/"
 
 # Load the data files
-ratings_df = pd.read_csv('u.data', sep='\t', names=['user_id', 'movie_id', 'rating', 'timestamp'])
-users_df = pd.read_csv('u.user', sep='|', names=['user_id', 'age', 'gender', 'occupation', 'zip_code'])
-movies_df = pd.read_csv('u.item', sep='|', encoding='latin-1', usecols=[0, 1], names=['movie_id', 'title'], header=None)
+ratings_df = pd.read_csv(base_path + 'u.data', sep='\t', names=['user_id', 'movie_id', 'rating', 'timestamp'])
+users_df = pd.read_csv(base_path + 'u.user', sep='|', names=['user_id', 'age', 'gender', 'occupation', 'zip_code'])
+movies_df = pd.read_csv(base_path + 'u.item', sep='|', encoding='latin-1', usecols=[0, 1], names=['movie_id', 'title'], header=None)
 
 # Parameters
 top_L = 5  # Number of top positive and negative movies to select

@@ -25,23 +25,27 @@ def generate_prompt(user_profile, history_window, top_k, include_dislikes=False,
     liked_movies = [
         f"{movie} ({', '.join(genres)})"
         for movie, genres, rating in history_window if rating >= positive_threshold
-    ]
+    ][:top_k]
 
     disliked_movies = [
         f"{movie} ({', '.join(genres)})"
         for movie, genres, rating in history_window if rating <= negative_threshold
-    ] if include_dislikes else []
+    ][:top_k] if include_dislikes else []
+
+    print(f"Liked movies: {', '.join(liked_movies)}")
+    print(f"Disliked movies: {', '.join(disliked_movies)}")
 
     # Build the dynamic prompt with both liked and disliked movies
-    prompt = f"""I am a {gender}, aged {age}, from {location}, working as {occupation}.
-I have previously watched and liked the movies: {liked_movies}."""
+    prompt = f"""I am a {gender}, aged {age}, from {location}, working as {occupation}."""
+
+    if liked_movies:
+        prompt += f"""I have previously watched and liked the movies: {liked_movies}."""
 
     if include_dislikes and disliked_movies:
-        prompt += f"\nI have also watched and disliked the movies: {disliked_movies}."
+        prompt += f"\nI have watched and HATED the movies: {disliked_movies}."
 
-    prompt += f"""
-Please provide recommendations for movies released before April 22nd, 1998, based on my history.
-Based on my history, recommend the top {top_k} movies I am most likely to watch next.
+    prompt += f"""Please provide recommendations for movies released before April 22nd, 1998, based on my history.
+Based on my profile, recommend the top {top_k} movies I am most likely to watch next.
 Please provide the output in a list of strings format, containing only the movie titles.
 Make sure to strictly adhere to the output format given below. Strictly do not generate any additional information other than the movie names.
 Format:  ['movie_name', 'movie_name', ... 'movie_name']
