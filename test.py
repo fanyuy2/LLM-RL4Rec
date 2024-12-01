@@ -1,104 +1,103 @@
+import itertools
 import json
-from transformers import pipeline
-from itertools import combinations
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
+from tqdm import tqdm
 
-def sample_and_evaluate(model_id, prompts, k=5, max_new_tokens=256):
+# Step 1: Generate k samples and evaluate
+def generate_and_evaluate_samples(model_id, dataset, k=5, metric="precision"):
+    """
+    Generate k samples for each prompt and evaluate their metrics.
+    """
     # Load model and tokenizer
-    test_model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        torch_dtype=torch.float16,
-    ).to("cuda")
+    model = AutoModelForCausalLM.from_pretrained(model_id).to("cuda")
     tokenizer = AutoTokenizer.from_pretrained(model_id)
-    pipe = pipeline("text-generation", model=test_model, tokenizer=tokenizer, device="cuda")
-
-    # Store sampled outputs and metrics
-    preference_data = []
-
-    for prompt in prompts:
-        # Sample k outputs for the prompt
-        samples = []
+    pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, device=0)
+    
+    preferences = []
+    for data in tqdm(dataset["train"]):
+        prompt = data["prompt"]
+        
+        # Generate k responses
+        responses = []
         for _ in range(k):
-            output = pipe(prompt, max_new_tokens=max_new_tokens, return_full_text=False)
-            generated_text = output[0]['generated_text']
-            samples.append(generated_text)
-
-        # Evaluate metrics for each sampled output
-        eval_results = []
-        for sample in samples:
-            llm_generated_movies = extract_movie_titles(sample)  # Your movie extraction function
-            matched_titles_with_scores = match_titles_batch(llm_generated_movies, all_movies)
-            recommended_movies = [title for title, score in matched_titles_with_scores if title]
-            metrics = evaluate_recommendations(ground_truth=[], recommended_movies=recommended_movies, k=k)  # Replace ground_truth
-            eval_results.append(metrics)
-
-        # Store the data
-        preference_data.append({
+            output = pipe(prompt, max_new_tokens=256, num_return_sequences=1)
+            response_text = output[0]["generated_text"]
+            responses.append(response_text)
+        
+        # Evaluate each response
+        metrics = []
+        for response in responses:
+            # Assuming `evaluate_recommendations` is your evaluation function
+            # Replace this with your actual evaluation logic
+            metric_value = evaluate_recommendations(data["completion"], response, metric)
+            metrics.append(metric_value)
+        
+        # Store results
+        preferences.append({
             "prompt": prompt,
-            "samples": [{"text": sample, "metrics": metrics} for sample, metrics in zip(samples, eval_results)]
+            "responses": responses,
+            "metrics": metrics
         })
+    
+    return preferences
 
-    return preference_data
-
-
-def generate_preference_data(preference_data, metric_key):
+# Step 2: Generate pairwise preferences
+def generate_pairwise_preferences(preferences, metric="precision"):
     """
-    Generate preference data from sampled outputs and their associated metrics.
-    Args:
-        preference_data: List of dictionaries with prompts, outputs, and metrics.
-        metric_key: The key of the metric to use for preference comparison.
-    Returns:
-        List of preference data in the format:
-        [{"prompt": prompt, "response_1": text_1, "response_2": text_2, "preference": int}]
+    Generate pairwise preference dataset based on metric comparisons.
     """
-    preference_dataset = []
-
-    for item in preference_data:
+    pairwise_data = []
+    for item in preferences:
         prompt = item["prompt"]
-        samples = item["samples"]
+        responses = item["responses"]
+        metrics = item["metrics"]
+        
+        # Generate all combinations of responses (kC2)
+        for (idx1, idx2) in itertools.combinations(range(len(responses)), 2):
+            response_1 = responses[idx1]
+            response_2 = responses[idx2]
+            metric_1 = metrics[idx1]
+            metric_2 = metrics[idx2]
+            
+            # Compare metrics and assign preference
+            if metric_1 > metric_2:
+                pairwise_data.append({
+                    "prompt": prompt,
+                    "response_1": response_1,
+                    "response_2": response_2,
+                    "preferred": "response_1"
+                })
+            elif metric_2 > metric_1:
+                pairwise_data.append({
+                    "prompt": prompt,
+                    "response_1": response_1,
+                    "response_2": response_2,
+                    "preferred": "response_2"
+                })
+    
+    return pairwise_data
 
-        # Generate pairwise comparisons (kC2)
-        for (sample_1, sample_2) in combinations(samples, 2):
-            response_1 = sample_1["text"]
-            response_2 = sample_2["text"]
-            metric_1 = sample_1["metrics"][metric_key]
-            metric_2 = sample_2["metrics"][metric_key]
+# Main script
+if __name__ == "__main__":
+    # Load your dataset (replace with actual dataset loading logic)
+    dataset = {
+        "train": [
+            {"prompt": "Recommend me some action movies.", "completion": "Mad Max, John Wick, Die Hard"},
+            {"prompt": "Suggest me romantic comedies.", "completion": "Crazy Rich Asians, Notting Hill, Love Actually"}
+        ]
+    }
+    
+    # Generate samples and evaluate
+    model_id = "gpt-3.5-turbo"
+    k = 5
+    preferences = generate_and_evaluate_samples(model_id, dataset, k, metric="precision")
+    
+    # Generate pairwise preferences
+    pairwise_preferences = generate_pairwise_preferences(preferences, metric="precision")
+    
+    # Save results to file
+    with open("preferences.jsonl", "w") as f:
+        for entry in pairwise_preferences:
+            f.write(json.dumps(entry) + "\n")
 
-            # Determine preference based on the metric
-            if metric_1 > metric_2:  # You can adjust this logic for specific metric meanings
-                preference = 1  # response_1 > response_2
-            elif metric_1 < metric_2:
-                preference = -1  # response_2 > response_1
-            else:
-                preference = 0  # No preference
-
-            # Append to preference dataset
-            preference_dataset.append({
-                "prompt": prompt,
-                "response_1": response_1,
-                "response_2": response_2,
-                "preference": preference,
-                "metrics_1": sample_1["metrics"],
-                "metrics_2": sample_2["metrics"]
-            })
-
-    return preference_dataset
-
-
-# Step 1: Generate samples and evaluate
-prompts = ["Recommend some movies for a rainy day.", "What are some great thrillers from the 90s?"]
-preference_data = sample_and_evaluate(model_id="your-model-id", prompts=prompts, k=5)
-
-# Save preference data for analysis
-with open("preference_data.json", "w") as f:
-    json.dump(preference_data, f, indent=4)
-
-# Step 2: Generate pairwise preference dataset
-metric_key = "precision@5"  # Replace with your chosen metric
-pairwise_preferences = generate_preference_data(preference_data, metric_key)
-
-# Save pairwise preferences
-with open("pairwise_preferences.json", "w") as f:
-    json.dump(pairwise_preferences, f, indent=4)
-
-
-
+    print("Pairwise preferences generated and saved!")
