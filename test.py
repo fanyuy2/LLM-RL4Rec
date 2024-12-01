@@ -3,6 +3,22 @@ import json
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 
+# Utility function to evaluate recommendations
+def evaluate_recommendations(ground_truth, response, metric="precision"):
+    """
+    Dummy evaluation function for recommendations.
+    Replace with your actual metric evaluation logic.
+    """
+    # For simplicity, assume the metric is based on overlap
+    ground_truth_set = set(ground_truth.split(", "))
+    response_set = set(response.split(", "))
+    if metric == "precision":
+        return len(ground_truth_set & response_set) / len(response_set) if response_set else 0
+    elif metric == "recall":
+        return len(ground_truth_set & response_set) / len(ground_truth_set) if ground_truth_set else 0
+    else:
+        raise ValueError(f"Unsupported metric: {metric}")
+
 # Step 1: Generate k samples and evaluate
 def generate_and_evaluate_samples(model_id, dataset, k=5, metric="precision"):
     """
@@ -14,22 +30,20 @@ def generate_and_evaluate_samples(model_id, dataset, k=5, metric="precision"):
     pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, device=0)
     
     preferences = []
-    for data in tqdm(dataset["train"]):
+    for data in tqdm(dataset["train"], desc="Generating samples and evaluating metrics"):
         prompt = data["prompt"]
+        ground_truth = data["completion"]
         
         # Generate k responses
         responses = []
+        metrics = []
         for _ in range(k):
             output = pipe(prompt, max_new_tokens=256, num_return_sequences=1)
             response_text = output[0]["generated_text"]
             responses.append(response_text)
-        
-        # Evaluate each response
-        metrics = []
-        for response in responses:
-            # Assuming `evaluate_recommendations` is your evaluation function
-            # Replace this with your actual evaluation logic
-            metric_value = evaluate_recommendations(data["completion"], response, metric)
+            
+            # Evaluate the response
+            metric_value = evaluate_recommendations(ground_truth, response_text, metric)
             metrics.append(metric_value)
         
         # Store results
@@ -47,7 +61,7 @@ def generate_pairwise_preferences(preferences, metric="precision"):
     Generate pairwise preference dataset based on metric comparisons.
     """
     pairwise_data = []
-    for item in preferences:
+    for item in tqdm(preferences, desc="Generating pairwise preferences"):
         prompt = item["prompt"]
         responses = item["responses"]
         metrics = item["metrics"]
@@ -79,7 +93,7 @@ def generate_pairwise_preferences(preferences, metric="precision"):
 
 # Main script
 if __name__ == "__main__":
-    # Load your dataset (replace with actual dataset loading logic)
+    # Load your dataset
     dataset = {
         "train": [
             {"prompt": "Recommend me some action movies.", "completion": "Mad Max, John Wick, Die Hard"},
@@ -87,17 +101,22 @@ if __name__ == "__main__":
         ]
     }
     
-    # Generate samples and evaluate
+    # Parameters
     model_id = "gpt-3.5-turbo"
     k = 5
-    preferences = generate_and_evaluate_samples(model_id, dataset, k, metric="precision")
+    metric = "precision"
     
-    # Generate pairwise preferences
-    pairwise_preferences = generate_pairwise_preferences(preferences, metric="precision")
+    # Step 1: Generate samples and evaluate metrics
+    print("Step 1: Generating and evaluating samples...")
+    preferences = generate_and_evaluate_samples(model_id, dataset, k, metric)
+    
+    # Step 2: Generate pairwise preference dataset
+    print("Step 2: Generating pairwise preferences...")
+    pairwise_preferences = generate_pairwise_preferences(preferences, metric)
     
     # Save results to file
     with open("preferences.jsonl", "w") as f:
         for entry in pairwise_preferences:
             f.write(json.dumps(entry) + "\n")
 
-    print("Pairwise preferences generated and saved!")
+    print("Pairwise preferences generated and saved to 'preferences.jsonl'.")
