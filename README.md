@@ -15,6 +15,8 @@ Fanyu
 - CF pipeline 
 - Evaluation
 
+- PPO - https://drive.google.com/file/d/1FGN1jHT1uOyKCJfoTbjpjLzQc934cFgF/view?usp=sharing
+
 - Pre SFT
  {'MAP': 0.006060606060606061,
  'NDCG@k': 0.006245369396893475,
